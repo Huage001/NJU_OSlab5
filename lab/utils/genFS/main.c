@@ -37,6 +37,7 @@ int main(int argc, char *argv[]) {
 
 int main(int argc, char *argv[]) {
 	char driver[NAME_LENGTH];
+	char srcFilePath[NAME_LENGTH];
 	char destDirPath[NAME_LENGTH];
 	char destFilePath[NAME_LENGTH];
 
@@ -47,6 +48,7 @@ int main(int argc, char *argv[]) {
     // All functions you need have been completed
 
 	format(driver, SECTOR_NUM, SECTORS_PER_BLOCK);
+	
 	stringCpy("/boot",destDirPath,NAME_LENGTH-1);
 	mkdir(driver,destDirPath);
 	stringCpy("/dev",destDirPath,NAME_LENGTH-1);
@@ -54,7 +56,8 @@ int main(int argc, char *argv[]) {
 	stringCpy("/usr",destDirPath,NAME_LENGTH-1);
 	mkdir(driver,destDirPath);
 	stringCpy("/boot/initrd",destFilePath,NAME_LENGTH-1);
-	touch(driver,destFilePath);
+	stringCpy("../../app/uMain.elf",srcFilePath,NAME_LENGTH-1);
+	cp(driver,srcFilePath,destFilePath);
 	stringCpy("/dev/stdin",destFilePath,NAME_LENGTH-1);
 	touch(driver,destFilePath);
 	stringCpy("/dev/stdout",destFilePath,NAME_LENGTH-1);
@@ -64,6 +67,7 @@ int main(int argc, char *argv[]) {
     ls(driver, "/boot/");
     ls(driver, "/dev/");
     ls(driver, "/usr/");
+	
     
     /** output:
     ls /
