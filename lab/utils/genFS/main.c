@@ -37,7 +37,7 @@ int main(int argc, char *argv[]) {
 
 int main(int argc, char *argv[]) {
 	char driver[NAME_LENGTH];
-	char srcFilePath[NAME_LENGTH];
+	char destDirPath[NAME_LENGTH];
 	char destFilePath[NAME_LENGTH];
 
 	stringCpy("fs.bin", driver, NAME_LENGTH - 1);
@@ -45,6 +45,20 @@ int main(int argc, char *argv[]) {
     // STEP 1
     // TODO: build file system of os.img, see lab5 4.3.
     // All functions you need have been completed
+
+	format(driver, SECTOR_NUM, SECTORS_PER_BLOCK);
+	stringCpy("/boot",destDirPath,NAME_LENGTH-1);
+	mkdir(driver,destDirPath);
+	stringCpy("/dev",destDirPath,NAME_LENGTH-1);
+	mkdir(driver,destDirPath);
+	stringCpy("/usr",destDirPath,NAME_LENGTH-1);
+	mkdir(driver,destDirPath);
+	stringCpy("/boot/initrd",destFilePath,NAME_LENGTH-1);
+	touch(driver,destFilePath);
+	stringCpy("/dev/stdin",destFilePath,NAME_LENGTH-1);
+	touch(driver,destFilePath);
+	stringCpy("/dev/stdout",destFilePath,NAME_LENGTH-1);
+	touch(driver,destFilePath);
 
     ls(driver, "/");
     ls(driver, "/boot/");
