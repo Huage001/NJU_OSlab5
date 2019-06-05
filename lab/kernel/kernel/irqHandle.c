@@ -26,6 +26,11 @@
 #define SEM_POST 2
 #define SEM_DESTROY 3
 
+#define O_WRITE 0x01
+#define O_READ 0x02
+#define O_CREATE 0x04
+#define O_DIRECTORY 0x08
+
 extern TSS tss;
 
 extern ProcessTable pcb[MAX_PCB_NUM];
@@ -222,13 +227,17 @@ void syscallHandle(struct StackFrame *sf) {
 
 void syscallOpen(struct StackFrame *sf) {
 	int i;
-	char tmp = 0;
+	//char tmp = 0;
 	int length = 0;
-	int cond = 0;
+	//int cond = 0;
 	int ret = 0;
 	int size = 0;
 	int baseAddr = (current + 1) * 0x100000; // base address of user process
 	char *str = (char*)sf->ecx + baseAddr; // file path
+	char fatherPath[NAME_LENGTH];
+	char fileName[NAME_LENGTH];
+	int count=0;
+	DirEntry *dirEntry = NULL;
 	Inode fatherInode;
 	Inode destInode;
 	int fatherInodeOffset = 0;
@@ -262,6 +271,102 @@ void syscallOpen(struct StackFrame *sf) {
             do something
         create file success or fail
     */
+   int isCreate=sf->edx&O_WRITE;
+   int isDir=sf->edx&O_DIRECTORY;
+   if(ret==0){
+	   if((destInode.type==DIRECTORY_TYPE&&!isDir)||(destInode.type!=DIRECTORY_TYPE&&isDir)){
+		   pcb[current].regs.eax=-1;
+		   return;
+	   }
+	   for(i=0;i<MAX_DEV_NUM;i++){
+		   if(dev[i].state&&dev[i].inodeOffset==destInodeOffset){
+			    if(dev[i].value<0){
+					dev[i].value--;
+					pcb[current].blocked.next = sem[i].pcb.next;
+					pcb[current].blocked.prev = &(sem[i].pcb);
+					dev[i].pcb.next = &(pcb[current].blocked);
+					(pcb[current].blocked.next)->prev = &(pcb[current].blocked);
+					
+					pcb[current].state = STATE_BLOCKED;
+					pcb[current].sleepTime = -1;
+					asm volatile("int $0x20");
+				}
+				else{
+					dev[i].value--;
+				}
+				pcb[current].regs.eax = i;
+				return;
+		   }
+	   }
+	   for(i=0;i<MAX_FILE_NUM;i++){
+		   if(file[i].state&&file[i].inodeOffset==destInodeOffset){
+				pcb[current].regs.eax=-1;
+		   	    return;
+		   }
+	   }
+	   for(i=0;i<MAX_FILE_NUM;i++){
+		   if(!file[i].state){
+			   file[i].state=1;
+			   file[i].inodeOffset=destInodeOffset;
+			   file[i].flags=sf->edx;
+			   file[i].offset=0;
+			   pcb[current].regs.eax=i+MAX_DEV_NUM;
+			   return;
+		   }
+	   }
+	   if(i==MAX_FILE_NUM){
+		   pcb[current].regs.eax=-1;
+		   return;
+	   }
+   }
+   else{
+	   if(!isCreate){
+		   pcb[current].regs.eax=-1;
+		   return;
+	   }
+	   if(!isDir){
+		   stringChrR(str,'/',&size);
+		   length=stringLen(str);
+		   if(size>=length-1){
+			   pcb[current].regs.eax=-1;
+			   return;
+		   }
+		   stringCpy(fatherPath,str,size);
+		   stringCpy(str+size+1,fileName,length-size-1);
+		   ret = readInode(&sBlock, gDesc, &fatherInode, &fatherInodeOffset, fatherPath);
+		   if(ret==0){
+			   ret=allocInode(&sBlock,gDesc,&fatherInode,fatherInodeOffset,&destInode,&destInodeOffset,fileName,REGULAR_TYPE);
+			   if(ret==0){
+				   for(i=0;i<MAX_FILE_NUM;i++){
+						if(!file[i].state){
+							file[i].state=1;
+							file[i].inodeOffset=destInodeOffset;
+							file[i].flags=sf->edx;
+							file[i].offset=0;
+							pcb[current].regs.eax=i+MAX_DEV_NUM;
+							return;
+						}
+	   				}
+					if(i==MAX_FILE_NUM){
+						pcb[current].regs.eax=-1;
+						return;
+					}
+			   }
+			   else{
+				   pcb[current].regs.eax=-1;
+				   return;
+			   }
+		   }
+		   else{
+			   pcb[current].regs.eax=-1;
+			   return;
+		   }
+	   }
+	   else{
+		   pcb[current].regs.eax=-1;
+		   return;
+	   }
+   }
 	
 	return;
 }
