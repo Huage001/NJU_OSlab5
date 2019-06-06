@@ -21,6 +21,10 @@
 #define O_CREATE 0x04
 #define O_DIRECTORY 0x08
 
+#define SEEK_SET 0
+#define SEEK_CUR 1
+#define SEEK_END 2
+
 #define SEM_INIT 0
 #define SEM_WAIT 1
 #define SEM_POST 2

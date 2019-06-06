@@ -67,6 +67,8 @@ void syscallSleep(struct StackFrame *sf);
 void syscallExit(struct StackFrame *sf);
 void syscallSem(struct StackFrame *sf);
 
+int recRemove(Inode* destInode,Inode* fatherInode,int* destInodeOffset,int* fatherInodeOffset,char* fileName);
+
 void syscallWriteStdOut(struct StackFrame *sf);
 void syscallWriteFile(struct StackFrame *sf);
 
@@ -280,8 +282,8 @@ void syscallOpen(struct StackFrame *sf) {
 	   }
 	   for(i=0;i<MAX_DEV_NUM;i++){
 		   if(dev[i].state&&dev[i].inodeOffset==destInodeOffset){
+			   	dev[i].value--;
 			    if(dev[i].value<0){
-					dev[i].value--;
 					pcb[current].blocked.next = sem[i].pcb.next;
 					pcb[current].blocked.prev = &(sem[i].pcb);
 					dev[i].pcb.next = &(pcb[current].blocked);
@@ -290,9 +292,6 @@ void syscallOpen(struct StackFrame *sf) {
 					pcb[current].state = STATE_BLOCKED;
 					pcb[current].sleepTime = -1;
 					asm volatile("int $0x20");
-				}
-				else{
-					dev[i].value--;
 				}
 				pcb[current].regs.eax = i;
 				return;
@@ -331,31 +330,32 @@ void syscallOpen(struct StackFrame *sf) {
 			   pcb[current].regs.eax=-1;
 			   return;
 		   }
-		   stringCpy(fatherPath,str,size);
+		   stringCpy(str,fatherPath,size+1);
 		   stringCpy(str+size+1,fileName,length-size-1);
 		   ret = readInode(&sBlock, gDesc, &fatherInode, &fatherInodeOffset, fatherPath);
 		   if(ret==0){
-			   ret=allocInode(&sBlock,gDesc,&fatherInode,fatherInodeOffset,&destInode,&destInodeOffset,fileName,REGULAR_TYPE);
-			   if(ret==0){
-				   for(i=0;i<MAX_FILE_NUM;i++){
-						if(!file[i].state){
-							file[i].state=1;
-							file[i].inodeOffset=destInodeOffset;
-							file[i].flags=sf->edx;
-							file[i].offset=0;
-							pcb[current].regs.eax=i+MAX_DEV_NUM;
-							return;
-						}
-	   				}
-					if(i==MAX_FILE_NUM){
-						pcb[current].regs.eax=-1;
-						return;
+			   	for(i=0;i<MAX_FILE_NUM;i++){
+					if(!file[i].state){
+						break;
 					}
-			   }
-			   else{
+	   			}
+				if(i==MAX_FILE_NUM){
+					pcb[current].regs.eax=-1;
+					return;
+				}
+			   	ret=allocInode(&sBlock,gDesc,&fatherInode,fatherInodeOffset,&destInode,&destInodeOffset,fileName,REGULAR_TYPE);
+			   	if(ret==0){
+				   	file[i].state=1;
+					file[i].inodeOffset=destInodeOffset;
+					file[i].flags=sf->edx;
+					file[i].offset=0;
+					pcb[current].regs.eax=i+MAX_DEV_NUM;
+					return;
+			   	}
+			   	else{
 				   pcb[current].regs.eax=-1;
 				   return;
-			   }
+			   	}
 		   }
 		   else{
 			   pcb[current].regs.eax=-1;
@@ -459,7 +459,42 @@ void syscallWriteFile(struct StackFrame *sf) {
     // TODO: try to complete file write
     /** condider as many situations as you can
     */
-	
+   	if(inode.type==DIRECTORY_TYPE||file[sf->ecx-MAX_DEV_NUM].offset>inode.size){
+		pcb[current].regs.eax=-1;
+		return;
+	}
+	i=remainder;
+	while(j<size){
+		if(quotient>=inode.blockCount){
+			ret=allocBlock(&sBlock,gDesc,&inode,file[sf->ecx - MAX_DEV_NUM].inodeOffset);
+			if(ret==-1){
+				pcb[current].regs.eax=j;
+				return;
+			}
+		}
+		ret=readBlock(&sBlock,&inode,quotient,buffer);
+		if(ret==-1){
+			pcb[current].regs.eax=j;
+			return;
+		}
+		int already=j;
+		for(;i<SECTOR_SIZE * SECTORS_PER_BLOCK;i++){
+			buffer[i]=str[j];
+			j++;
+			file[sf->ecx - MAX_DEV_NUM].offset++;
+			if(j==size){
+				break;
+			}
+		}
+		i=0;
+		ret=writeBlock(&sBlock,&inode,quotient,buffer);
+		if(ret==-1){
+			pcb[current].regs.eax=already;
+			return;
+		}
+		quotient++;
+	}
+	pcb[current].regs.eax=size;
 	return;
 }
 
@@ -528,7 +563,7 @@ void syscallReadFile(struct StackFrame *sf) {
 		pcb[current].regs.eax = -1;
 		return;
 	}
-
+	int ret;
 	int i = 0;
 	int j = 0;
 	int baseAddr = (current + 1) * 0x100000; // base address of user process
@@ -545,6 +580,40 @@ void syscallReadFile(struct StackFrame *sf) {
     // TODO: try to complete file read
     /** consider different size
     */
+	if(inode.type==DIRECTORY_TYPE||file[sf->ecx-MAX_DEV_NUM].offset>inode.size){
+		pcb[current].regs.eax=-1;
+		return;
+	}
+	if(size>inode.size-file[sf->ecx-MAX_DEV_NUM].offset){
+		size=inode.size-file[sf->ecx-MAX_DEV_NUM].offset;
+	}
+	if (size <= 0) {
+		pcb[current].regs.eax = 0;
+		return;
+	}
+	i=remainder;
+	while(j<size){
+		if(quotient>=inode.blockCount){
+			pcb[current].regs.eax=j;
+			return;
+		}
+		ret=readBlock(&sBlock,&inode,quotient,buffer);
+		if(ret==-1){
+			pcb[current].regs.eax=j;
+			return;
+		}
+		for(;i<SECTOR_SIZE * SECTORS_PER_BLOCK;i++){
+			str[j]=buffer[i];
+			j++;
+			file[sf->ecx - MAX_DEV_NUM].offset++;
+			if(j==size){
+				break;
+			}
+		}
+		i=0;
+		quotient++;
+	}
+	pcb[current].regs.eax=size;   
 	return;
 }
 
@@ -554,7 +623,36 @@ void syscallLseek(struct StackFrame *sf) {
     /**
     consider different file type and different whence
     */
-    
+    if (sf->ecx >= MAX_DEV_NUM && sf->ecx < MAX_DEV_NUM + MAX_FILE_NUM) {
+		if (file[sf->ecx - MAX_DEV_NUM].state == 1){
+			int target=-1;
+			Inode inode;
+			diskRead(&inode, sizeof(Inode), 1, file[sf->ecx - MAX_DEV_NUM].inodeOffset);
+			switch(sf->ebx){
+				case SEEK_SET:
+					target=sf->edx;
+					break;
+				case SEEK_CUR:
+					target=sf->edx+file[sf->ecx - MAX_DEV_NUM].offset;
+					break;
+				case SEEK_END:
+					target=sf->edx+inode.size;
+					break;
+				default:
+					break;
+			}
+			if(target>=0&&target<=inode.size){
+				file[sf->ecx - MAX_DEV_NUM].offset=target;
+				pcb[current].regs.eax=target;
+				return;
+			}
+			else{
+				pcb[current].regs.eax=-1;
+				return;
+			}
+		}
+	}
+	pcb[current].regs.eax=-1;
 	return;
 }
 
@@ -568,8 +666,39 @@ void syscallClose(struct StackFrame *sf) {
         do something
     close file
     */
-	
-	return;
+	if(sf->ecx<0||sf->ecx>=MAX_DEV_NUM+MAX_FILE_NUM){
+		pcb[current].regs.eax=-1;
+		return;
+	}
+	if(sf->ecx<MAX_DEV_NUM){
+		if(dev[sf->ecx].state){
+			dev[sf->ecx].value++;
+			if(dev[sf->ecx].value<=0){
+				ProcessTable *pt = NULL;
+				pt = (ProcessTable*)((uint32_t)(dev[sf->ecx].pcb.prev) -
+				(uint32_t)&(((ProcessTable*)0)->blocked));
+				pt->state = STATE_RUNNABLE;
+				pt->sleepTime = 0;
+				dev[sf->ecx].pcb.prev = (dev[sf->ecx].pcb.prev)->prev;
+				(dev[sf->ecx].pcb.prev)->next = &(dev[sf->ecx].pcb);
+			}
+			pcb[current].regs.eax=0;
+			return;
+		}
+		pcb[current].regs.eax=-1;
+		return;	
+	}
+	else{
+		if(file[sf->ecx-MAX_DEV_NUM].state==0){
+			pcb[current].regs.eax=-1;
+			return;
+		}
+		else{
+			file[sf->ecx-MAX_DEV_NUM].state=0;
+			pcb[current].regs.eax=0;
+			return;
+		}
+	}
 }
 
 void syscallRemove(struct StackFrame *sf) {
@@ -585,6 +714,8 @@ void syscallRemove(struct StackFrame *sf) {
 	Inode destInode;
 	int fatherInodeOffset = 0;
 	int destInodeOffset = 0;
+	char fatherPath[NAME_LENGTH];
+	char fileName[NAME_LENGTH];
 
 	ret = readInode(&sBlock, gDesc, &destInode, &destInodeOffset, str);
     
@@ -601,7 +732,73 @@ void syscallRemove(struct StackFrame *sf) {
         do
     }
     */
-	return;
+   	if(ret==0){
+		for(i=0;i<MAX_DEV_NUM;i++){
+		   	if(dev[i].state&&dev[i].inodeOffset==destInodeOffset){
+			   	pcb[current].regs.eax=-1;
+			   	return;
+		   	}
+		}
+		for(i=0;i<MAX_FILE_NUM;i++){
+			if(file[i].state==1&&file[i].inodeOffset==destInodeOffset){
+				pcb[current].regs.eax=-1;
+			   	return;
+			}
+		}
+		length=stringLen(str);
+		if(str[length-1]=='/'){
+			stringCpy(str,fatherPath,length-1);
+			length--;
+		}
+		else{
+			stringCpy(str,fatherPath,length);
+		}
+		stringChrR(fatherPath,'/',&size);
+		stringCpy(str,fatherPath,size+1);
+		stringCpy(str+size+1,fileName,length-size-1);
+		readInode(&sBlock, gDesc, &fatherInode, &fatherInodeOffset, fatherPath);
+		ret=recRemove(&destInode,&fatherInode,&destInodeOffset,&fatherInodeOffset,fileName);
+		pcb[current].regs.eax=ret;
+		return;
+	}
+	else{
+		pcb[current].regs.eax=-1;
+		return;
+	}
+}
+
+int recRemove(Inode* destInode,Inode* fatherInode,int* destInodeOffset,int* fatherInodeOffset,char* fileName){
+	int ret;
+	int i;
+	int j;
+	uint8_t buffer[BLOCK_SIZE];
+	int* nextInodeOffset;
+	Inode nextInode;
+	DirEntry *dirEntry = NULL;
+	if(destInode->type!=DIRECTORY_TYPE){
+		return freeInode(&sBlock,gDesc,fatherInode,*fatherInodeOffset,destInode,destInodeOffset,fileName,destInode->type);
+	}
+	int blockCount = destInode->blockCount;
+	for (i = 0; i < blockCount; i ++) {
+		ret = readBlock(&sBlock, destInode, i, buffer);
+		if (ret == -1)
+			return -1;
+		dirEntry = (DirEntry*)buffer;
+		for (j = 0; j < sBlock.blockSize / sizeof(DirEntry); j ++) {
+			if (dirEntry[j].inode == 0){ 
+				continue;
+			}
+			else{
+				*nextInodeOffset = dirEntry[j].inode;
+				diskRead(&nextInode, sizeof(Inode), 1, *nextInodeOffset);
+				ret=recRemove(&nextInode,destInode,nextInodeOffset,destInodeOffset,dirEntry[j].name);
+				if(ret==-1){
+					return -1;
+				}
+			}
+		}
+	}
+	return freeInode(&sBlock,gDesc,fatherInode,*fatherInodeOffset,destInode,destInodeOffset,fileName,destInode->type);
 }
 
 void syscallFork(struct StackFrame *sf) {
