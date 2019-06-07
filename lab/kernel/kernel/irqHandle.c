@@ -580,7 +580,7 @@ void syscallReadFile(struct StackFrame *sf) {
     // TODO: try to complete file read
     /** consider different size
     */
-	if(inode.type==DIRECTORY_TYPE||file[sf->ecx-MAX_DEV_NUM].offset>inode.size){
+	if(file[sf->ecx-MAX_DEV_NUM].offset>inode.size){
 		pcb[current].regs.eax=-1;
 		return;
 	}
@@ -608,6 +608,10 @@ void syscallReadFile(struct StackFrame *sf) {
 			file[sf->ecx - MAX_DEV_NUM].offset++;
 			if(j==size){
 				break;
+			}
+			if(file[sf->ecx-MAX_DEV_NUM].offset==inode.size){
+				pcb[current].regs.eax=j;   
+				return;
 			}
 		}
 		i=0;

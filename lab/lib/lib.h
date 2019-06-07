@@ -31,6 +31,7 @@
 #define SEM_DESTROY 3
 
 #define MAX_BUFFER_SIZE 256
+#define DIRENTRY_SIZE 128
 
 int open(char *path, int flags);
 
