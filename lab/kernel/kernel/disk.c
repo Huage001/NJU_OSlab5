@@ -53,6 +53,7 @@ void diskRead (void *destBuffer, int size, int num, int offset) {
 		i ++;
 		if ((remainder + i) % SECTOR_SIZE == 0) {
 			readSect((void*)buffer, 201 + quotient + j);
+			remainder=0;
 			j ++;
 		}
 	}
@@ -73,6 +74,7 @@ void diskWrite (void *destBuffer, int size, int num, int offset) {
 			writeSect((void*)buffer, 201 + quotient + j);
 			j ++;
 			readSect((void*)buffer, 201 + quotient + j);
+			remainder=0;
 		}
 	}
 	writeSect((void*)buffer, 201 + quotient + j);

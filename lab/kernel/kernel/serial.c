@@ -21,3 +21,24 @@ void putChar(char ch) {
 	outByte(SERIAL_PORT, ch);
 }
 
+/*******************Here are my functions for debug**********************/
+
+void printStr(char* str){
+	for(int i=0;str[i]!=0;i++){
+		putChar(str[i]);
+	}
+	putChar('\n');
+}
+
+void printNum(uint32_t num){
+	char buffer[10];
+	int index=0;
+	do{
+		buffer[index++]=num%10+'0';
+		num/=10;
+	}while(num!=0);
+	for(int i=index-1;i>=0;i--){
+		putChar(buffer[i]);
+	}
+	putChar('\n');
+}

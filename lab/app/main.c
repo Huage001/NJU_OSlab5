@@ -27,7 +27,7 @@ int ls(char *destFilePath) {
 	int i;
 	DirEntry* dirEntry;
     printf("ls %s\n",destFilePath);
-	fd=open(destFilePath,O_READ);
+	fd=open(destFilePath,O_READ|O_DIRECTORY);
 	if(fd==-1){
 		printf("ls failed!\n");
 		return -1;
@@ -45,6 +45,7 @@ int ls(char *destFilePath) {
 			printf("%s ",dirEntry->name);
 		}
 	}
+	ret=close(fd);
 	printf("\nls success!\n");
 	return 0;
 }
@@ -59,7 +60,6 @@ int cat(char *destFilePath) {
     int fd;
 	int ret;
 	uint8_t buffer[MAX_BUFFER_SIZE];
-	int i;
     printf("cat %s\n",destFilePath);
 	fd=open(destFilePath,O_READ);
 	if(fd==-1){
@@ -78,6 +78,7 @@ int cat(char *destFilePath) {
 		buffer[ret]=0;
 		printf("%s",buffer);
 	}
+	close(fd);
 	printf("\ncat success!\n");
 	return 0;
 }
@@ -109,7 +110,6 @@ int uEntry(void) {
 		write(fd, (uint8_t*)&tmp, 1);
 	}
 	close(fd);
-	ls("/usr/");
 	cat("/usr/test");
 	printf("\n");
 	printf("rm /usr/test\n");

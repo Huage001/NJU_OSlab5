@@ -879,7 +879,7 @@ int readInode (SuperBlock *superBlock, GroupDesc *groupDesc,
 			//ret = readBlock(file, superBlock, destInode, i, buffer);
 			ret = readBlock(superBlock, destInode, i, buffer);
 			if (ret == -1)
-				return -1;
+				return -1;		
 			dirEntry = (DirEntry*)buffer;
 			for (j = 0; j < superBlock->blockSize / sizeof(DirEntry); j ++) {
 				if (dirEntry[j].inode == 0) // empty dirEntry

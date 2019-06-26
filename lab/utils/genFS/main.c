@@ -56,7 +56,7 @@ int main(int argc, char *argv[]) {
 	stringCpy("/usr",destDirPath,NAME_LENGTH-1);
 	mkdir(driver,destDirPath);
 	stringCpy("/boot/initrd",destFilePath,NAME_LENGTH-1);
-	stringCpy("../../app/uMain.elf",srcFilePath,NAME_LENGTH-1);
+	stringCpy(argv[1],srcFilePath,NAME_LENGTH-1);
 	cp(driver,srcFilePath,destFilePath);
 	stringCpy("/dev/stdin",destFilePath,NAME_LENGTH-1);
 	touch(driver,destFilePath);

@@ -88,6 +88,10 @@ void initDev () {
 		dev[i].pcb.next = &(dev[i].pcb);
 		dev[i].pcb.prev = &(dev[i].pcb);
 	}
+
+	//XXX
+	readGroupHeader(&sBlock, gDesc);
+
 	readInode(&sBlock, gDesc, &inode, &inodeOffset, "/dev/stdout");
 	dev[0].inodeOffset = inodeOffset; // for STD_OUT
 	readInode(&sBlock, gDesc, &inode, &inodeOffset, "/dev/stdin");
@@ -180,6 +184,9 @@ uint32_t loadUMain(void) {
 */
 
 uint32_t loadUMain(void) {
+	//putChar('L');
+	//putChar('\n');
+
 	int i = 0;
 	int phoff = 0x34; // program header offset
 	int offset = 0x1000; // .text section offset
@@ -187,6 +194,9 @@ uint32_t loadUMain(void) {
 	uint32_t uMainEntry = 0x200000;
 	Inode inode;
 	int inodeOffset = 0;
+
+	//XXX
+	readGroupHeader(&sBlock, gDesc);
 
 	//readInode(&sBlock, gDesc, &inode, &inodeOffset, "/uMain.elf");
 	readInode(&sBlock, gDesc, &inode, &inodeOffset, "/boot/initrd");
@@ -202,6 +212,9 @@ uint32_t loadUMain(void) {
 	for (i = 0; i < 200 * 512; i ++) {
 		*(uint8_t *)(elf + i) = *(uint8_t *)(elf + i + offset);
 	}
+
+	//putChar('L');
+	//putChar('\n');
 
 	return uMainEntry;
 }
